@@ -5,6 +5,14 @@ import numpy as np
 import plotly.graph_objects as go
 import plotly.express as px
 
+import datetime as dt
+
+month_to_season = {
+    12: "winter", 1: "winter", 2: "winter",
+    3: "spring", 4: "spring", 5: "spring",
+    6: "summer", 7: "summer", 8: "summer",
+    9: "autumn", 10: "autumn", 11: "autumn"
+}
 
 def validate_openweather_key(api_key):
     url = "https://api.openweathermap.org/data/2.5/weather"
@@ -76,7 +84,7 @@ with st.sidebar:
             st.session_state["OWM_VALID"] = ok
             st.session_state["OWM_ERROR"] = err
 
-        st.rerun() 
+        st.rerun()
 
     api_key_saved = st.session_state.get("OPENWEATHER_API_KEY", "").strip()
     owm_valid = st.session_state.get("OWM_VALID", False)
@@ -242,7 +250,20 @@ with tab2:
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0)
     )
 
-    st.plotly_chart(fig, use_container_width=True)
+    # --- WOW: линия "сейчас" (если уже запрашивали погоду для этого города) ---
+    temp_now = st.session_state.get("LAST_TEMP_NOW")
+    last_city = st.session_state.get("LAST_CITY_NOW")
+    is_anom_now = st.session_state.get("LAST_IS_ANOMALY_NOW")
+
+    if (temp_now is not None) and (last_city == selected_city):
+        label = f"Сейчас: {float(temp_now):.1f}°C"
+        if is_anom_now is True:
+            label += " 🔥 Аномалия"
+        elif is_anom_now is False:
+            label += " ✅ Норма"
+
+        fig.add_hline(y=float(temp_now),line_dash="dash",line_width=2,annotation_text=label,annotation_position="top left")
+
 
 with tab3:
     st.subheader(f"Сезонные профили: {selected_city}")
@@ -267,11 +288,14 @@ with tab3:
 
     st.plotly_chart(fig2, use_container_width=True)
 
-st.subheader("Текущая погода")
+st.subheader("Текущая погода + проверка нормы сезона")
 
 api_key_saved = st.session_state.get("OPENWEATHER_API_KEY", "").strip()
 owm_valid = st.session_state.get("OWM_VALID", False)
 owm_err = st.session_state.get("OWM_ERROR", None)
+
+season_now = month_to_season[dt.datetime.now().month]
+st.write(f"Текущий сезон (по месяцу): **{season_now}**")
 
 if not api_key_saved:
     st.info("API key не введён — текущая погода не отображается.")
@@ -281,12 +305,45 @@ elif not owm_valid:
         st.json(owm_err)
 else:
     country_code = st.text_input("Country code (опционально, например RU/DE/AE)", value="")
-    if st.button("Получить текущую температуру"):
+
+    if st.button("Получить текущую температуру и проверить норму"):
         try:
+            # 1) current temp from API
             temp_now = get_current_temp_sync(selected_city, api_key_saved, country_code or None)
-            st.success(f"Сейчас в {selected_city}: **{temp_now:.1f} °C**")
+
+            # 2) seasonal bounds from historical stats for THIS city
+            # season_stats ты уже считаешь выше через compute_city_features(df_city, ...)
+            row = season_stats[season_stats["season"] == season_now]
+            if row.empty:
+                st.warning(f"В исторических данных для {selected_city} нет сезона '{season_now}'.")
+                st.success(f"Сейчас в {selected_city}: **{temp_now:.1f} °C**")
+                st.stop()
+
+            mean = float(row["season_mean"].iloc[0])
+            std  = float(row["season_std"].iloc[0])
+            low  = mean - 2 * std
+            high = mean + 2 * std
+
+            is_anom = bool(np.logical_or(temp_now < low, temp_now > high))
+
+            # 3) output
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Сейчас (°C)", f"{temp_now:.1f}")
+            c2.metric("Норма сезона (mean)", f"{mean:.1f}")
+            c3.metric("Интервал ±2σ", f"[{low:.1f}, {high:.1f}]")
+
+            if is_anom:
+                st.error(f"🔥 **Аномалия**: {temp_now:.1f} °C вне диапазона сезона {season_now}.")
+            else:
+                st.success(f"✅ **Норма**: {temp_now:.1f} °C в пределах диапазона сезона {season_now}.")
+
+            # (опционально) сохраним для использования в графике
+            st.session_state["LAST_TEMP_NOW"] = temp_now
+            st.session_state["LAST_SEASON_NOW"] = season_now
+            st.session_state["LAST_CITY_NOW"] = selected_city
+            st.session_state["LAST_IS_ANOMALY_NOW"] = is_anom
+
+            st.rerun()
+
         except Exception as e:
             st.exception(e)
-
-
-
