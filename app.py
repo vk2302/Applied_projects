@@ -119,7 +119,7 @@ if uploaded_file is not None:
             y=anomalies['temperature'],
             mode='markers',
             name='Аномалии',
-            marker=dict(color='red', size=5, symbol='*')
+            marker=dict(color='red', size=5, symbol='star')
         ))
         
         # скользящее среднее - основная линия
