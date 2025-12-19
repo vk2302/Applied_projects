@@ -6,12 +6,12 @@ import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 
-# --- Конфигурация страницы ---
+# заголовок
 st.set_page_config(page_title="Анализ Температурных Данных", layout="wide")
 
-st.title("🌦️ Мониторинг Погоды и Анализ Исторических Данных")
+st.title("🌦️ Текущая погода и Исторические тренды по городам")
 
-# --- Вспомогательные функции ---
+# функции
 
 def get_season(month):
     if month in [12, 1, 2]:
@@ -23,14 +23,12 @@ def get_season(month):
     else:
         return "autumn"
 
-def load_data(uploaded_file):
+def load_data(uploaded_file): # чтение файла, создание столбца с текущим временем и сезоном
     if uploaded_file is not None:
         try:
             df = pd.read_csv(uploaded_file)
-            # Убедимся, что колонка с датой в правильном формате
             if 'timestamp' in df.columns:
                 df['timestamp'] = pd.to_datetime(df['timestamp'])
-                # Если колонки season нет, создадим её
                 if 'season' not in df.columns:
                     df['season'] = df['timestamp'].dt.month.map(get_season)
             return df
@@ -39,17 +37,17 @@ def load_data(uploaded_file):
             return None
     return None
 
+# повторение того, что в ноутбуке: статистика температуры по сезонам, определение интервала для аномалий
 def calculate_stats(df, city):
     city_data = df[df['city'] == city].copy()
-    
-    # Описательная статистика
+
+    # для выбранного города выведем основную базовую информацию
     stats = city_data['temperature'].describe()
     
     # Сезонные профили (как в ноутбуке)
     seasonal_stats = city_data.groupby('season')['temperature'].agg(['mean', 'std']).reset_index()
     
-    # Аномалии: вычисляем границы для каждой записи на основе сезона
-    # Сначала мерджим сезонные статистики обратно к данным города
+    # Аномалии: вычисляем границы для каждой записи на основе сезона по каждому городу
     city_data = city_data.merge(seasonal_stats, on='season', suffixes=('', '_season'))
     
     city_data['lower_bound'] = city_data['mean'] - 2 * city_data['std']
@@ -60,13 +58,10 @@ def calculate_stats(df, city):
     
     return city_data, stats, seasonal_stats
 
+# повторение функции из тренировочного ноутбука + проверка АПИ
 def get_current_weather(city, api_key):
     url = "http://api.openweathermap.org/data/2.5/weather"
-    params = {
-        "q": city,
-        "appid": api_key,
-        "units": "metric"
-    }
+    params = {"q": city, "appid": api_key, "units": "metric"}
     response = requests.get(url, params=params)
     
     if response.status_code == 401:
@@ -76,30 +71,25 @@ def get_current_weather(city, api_key):
     
     return response.json()
 
-# --- Боковая панель ---
+# сбоку будет находиться форма для загрузки csv файла и ввода АПИ-ключа
 st.sidebar.header("Настройки")
 
-# 1. Загрузка файла
-uploaded_file = st.sidebar.file_uploader("Загрузите файл с историческими данными (CSV)", type="csv")
+uploaded_file = st.sidebar.file_uploader("Загрузите CSV-файл с историческими данными", type="csv")
 
-# 2. API Key
 api_key = st.sidebar.text_input("Введите API-ключ OpenWeatherMap", type="password")
 
-# --- Основная логика ---
 
 if uploaded_file is not None:
     df = load_data(uploaded_file)
     
     if df is not None:
-        # 3. Выбор города
+        # Выбор города из выпадающего списка, затем статистика по нему
         cities = df['city'].unique()
         selected_city = st.selectbox("Выберите город", cities)
         
-        # Обработка данных для города
         city_df, des_stats, seasonal_stats = calculate_stats(df, selected_city)
         
-        # --- Раздел 1: Описательная статистика ---
-        st.subheader(f"📊 Исторические данные: {selected_city}")
+        st.subheader(f"📊 Исторические данные для города: {selected_city}")
         
         col1, col2, col3, col4 = st.columns(4)
         col1.metric("Средняя темп.", f"{des_stats['mean']:.2f} °C")
@@ -107,13 +97,12 @@ if uploaded_file is not None:
         col3.metric("Макс. темп.", f"{des_stats['max']:.2f} °C")
         col4.metric("Станд. откл.", f"{des_stats['std']:.2f} °C")
         
-        # --- Раздел 2: Визуализация временного ряда с аномалиями ---
-        st.subheader("📈 Временной ряд температур")
-        
-        # Используем Plotly для интерактивности
+        st.subheader("📈 История температуры за 10 лет")
+
+        # используем plotly, в отличие от ноутбука
         fig = go.Figure()
         
-        # Линия обычной температуры
+        # температура посуточная
         fig.add_trace(go.Scatter(
             x=city_df['timestamp'], 
             y=city_df['temperature'],
@@ -123,38 +112,37 @@ if uploaded_file is not None:
             opacity=0.6
         ))
         
-        # Выделение аномалий
+        # обозначение красным цветом точек аномалий
         anomalies = city_df[city_df['is_anomaly']]
         fig.add_trace(go.Scatter(
             x=anomalies['timestamp'], 
             y=anomalies['temperature'],
             mode='markers',
             name='Аномалии',
-            marker=dict(color='red', size=6, symbol='x')
+            marker=dict(color='red', size=5, symbol='*')
         ))
         
-        # Добавляем скользящее среднее (опционально, для красоты)
+        # скользящее среднее - основная линия
         city_df['rolling_mean'] = city_df['temperature'].rolling(window=30).mean()
         fig.add_trace(go.Scatter(
             x=city_df['timestamp'],
             y=city_df['rolling_mean'],
             mode='lines',
-            name='Скользящее среднее (30д)',
+            name='Средняя Т, за 30сут',
             line=dict(color='orange', width=2)
         ))
 
         fig.update_layout(
-            title=f"Температура в {selected_city} с выделением аномалий",
-            xaxis_title="Дата",
+            title=f"{selected_city}: температурный тренд 2010-2020",
+            xaxis_title="Год измерений",
             yaxis_title="Температура (°C)",
             hovermode="x unified"
         )
         st.plotly_chart(fig, use_container_width=True)
         
-        # --- Раздел 3: Сезонные профили ---
+        # Профили температур (среднее и стандартотклон) по сезонам
         st.subheader("🍂 Сезонные профили")
-        
-        # Подготовка данных для отображения
+
         seasonal_display = seasonal_stats.copy()
         seasonal_display.columns = ['Сезон', 'Средняя температура', 'Стандартное отклонение']
         
@@ -166,7 +154,6 @@ if uploaded_file is not None:
             st.dataframe(seasonal_display.style.format("{:.2f}", subset=['Средняя температура', 'Стандартное отклонение']))
             
         with scol2:
-            # Бар-чарт сезонности
             fig_season = px.bar(
                 seasonal_stats, 
                 x='season', 
@@ -178,28 +165,27 @@ if uploaded_file is not None:
             )
             st.plotly_chart(fig_season, use_container_width=True)
 
-        # --- Раздел 4: Текущая погода (API) ---
+        # вывод текущей температуры для города
         st.divider()
         st.subheader(f"🌍 Текущая погода: {selected_city}")
         
         if api_key:
             current_weather = get_current_weather(selected_city, api_key)
-            
+            # проверка ключа 
             if "cod" in current_weather and current_weather["cod"] == 401:
                 st.error(f"Ошибка API: {current_weather['message']}")
             elif "cod" in current_weather and current_weather["cod"] != 200:
                 st.error(f"Не удалось получить погоду: {current_weather.get('message', 'Unknown error')}")
             else:
-                # Данные получены успешно
                 curr_temp = current_weather['main']['temp']
                 curr_humidity = current_weather['main']['humidity']
                 curr_desc = current_weather['weather'][0]['description']
                 
-                # Определение текущего сезона
+                # Как в ноутбуке, определеним текущий сезон
                 current_month = datetime.now().month
                 current_season = get_season(current_month)
                 
-                # Проверка на нормальность
+                # Проверка на аномалию
                 season_row = seasonal_stats[seasonal_stats['season'] == current_season]
                 if not season_row.empty:
                     mean_temp = season_row['mean'].values[0]
@@ -224,7 +210,7 @@ if uploaded_file is not None:
                         if is_normal:
                             st.success("✅ Текущая температура в пределах нормы для сезона.")
                         else:
-                            st.warning("⚠️ Текущая температура является аномальной для этого сезона!")
+                            st.warning("⚠️ Текущая температура аномальна для этого сезона!")
                 else:
                     st.info("Недостаточно исторических данных для анализа текущего сезона.")
         else:
@@ -233,7 +219,7 @@ if uploaded_file is not None:
     else:
         st.warning("Пожалуйста, убедитесь, что ваш CSV файл содержит необходимые колонки (city, timestamp, temperature).")
 else:
-    st.info("👈 Пожалуйста, загрузите CSV файл с историческими данными в меню слева для начала работы.")
+    st.info("Пожалуйста, загрузите CSV файл с историческими данными в меню слева для начала работы.")
     st.markdown("""
     **Ожидаемый формат файла:**
     * `city`: Название города
