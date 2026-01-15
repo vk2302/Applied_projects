@@ -39,6 +39,7 @@ async def search_food_candidates(
     user_agent: str,
     page_size: int = 10,
     limit: int = 5,
+    timeout_s: float = 6.0
 ) -> list[FoodInfo]:
     url = "https://world.openfoodfacts.org/cgi/search.pl"
     params = {
@@ -50,6 +51,7 @@ async def search_food_candidates(
         "fields": "code,product_name,product_name_ru,generic_name,generic_name_ru,nutriments",
     }
     headers = {"User-Agent": user_agent}
+    timeout = aiohttp.ClientTimeout(total=timeout_s)
 
     async with session.get(url, params=params, headers=headers) as resp:
         resp.raise_for_status()

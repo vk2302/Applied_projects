@@ -26,7 +26,7 @@ def _ask_prompt_for(state_name: str) -> str:
         ProfileStates.height_cm.state: "Введите Ваш рост (в см):",
         ProfileStates.age.state: "Введите Ваш возраст:",
         ProfileStates.activity_min.state: "Сколько минут в день Вы обычно (в среднем) занимаетесь спортом?",
-        ProfileStates.city.state: "Где Вы живете? Укажите ближайший город, английскими буквами",
+        ProfileStates.city.state: "Где Вы живете? Укажите ближайший город (лучше использовать язык страны проживания)",
         ProfileStates.calorie_goal.state: ("Пожалуйста, напишите Вашу цель по калориям (опционально): число ккал или 'auto' (по умолчанию)"),
     }
     return prompts[state_name]

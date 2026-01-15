@@ -33,30 +33,38 @@ async def log_food_start(message: Message, state: FSMContext, http: aiohttp.Clie
     if len(parts) < 2:
         await message.answer("Необходимо ввести команду /log_food, затем название Вашего продукта: Вам будут предложены наиболее близкие варианты")
         return
-
+    
+    query = parts[1].strip()
     user_id = message.from_user.id
     profile = get_profile(user_id)
     if not profile:
         await message.answer("Необходимо сначала настроить профиль через команду /set_profile")
         return
-
-    query = parts[1].strip()
+    
     if len(query) < 2:
         await message.answer("Пожалуйста, введите более полное название")
         return
 
     await state.clear()
 
+    try:
     candidates = await search_food_candidates(
         http,
         query=query,
         user_agent=settings.OFF_USER_AGENT,
         page_size=15,
         limit=5,
+        timeout_s=10.0,
     )
+    except (asyncio.TimeoutError, aiohttp.ClientError):
+        await message.answer(
+            "Сервис слишком долго ищет Ваш запрос. "
+            "Напишите более короткое, понятное название."
+            )
+        return
 
     if not candidates:
-        await message.answer("Не смог найти продукт, пожалуйста, попробуйте указать конкретный продукт из магазина (на английском).")
+        await message.answer("Не смог найти продукт, пожалуйста, попробуйте указать конкретный продукт из магазина (можно также попробовать на английском).")
         return
 
     if len(candidates) == 1:
