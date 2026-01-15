@@ -57,6 +57,8 @@ def main() -> None:
     async def on_startup(_: web.Application) -> None:
         http = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10))
         app["http"] = http
+        dp["http"] = http
+        dp.workflow_data["http"] = http
 
         webhook_url = f"{get_base_url()}{WEBHOOK_PATH}"
         await bot.set_webhook(
@@ -68,22 +70,19 @@ def main() -> None:
 
     async def on_shutdown(_: web.Application) -> None:
         await bot.delete_webhook(drop_pending_updates=True)
-        http: aiohttp.ClientSession | None = app.get("http")
+        http = app.get("http")
         if http:
             await http.close()
         logging.info("Webhook deleted; http session closed")
 
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)
-    
-    def data_factory(_: web.Request) -> dict:
-        return {"http": app["http"]}
 
     SimpleRequestHandler(
         dispatcher=dp,
         bot=bot,
         secret_token=WEBHOOK_SECRET,
-    ).register(app, path=WEBHOOK_PATH, data_factory=data_factory)
+    ).register(app, path=WEBHOOK_PATH)
 
     setup_application(app, dp, bot=bot)
 
@@ -92,4 +91,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
