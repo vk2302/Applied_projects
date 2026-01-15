@@ -13,23 +13,28 @@ from app.bot.handlers.water import router as water_router
 from app.bot.handlers.food import router as food_router
 from app.bot.handlers.workout import router as workout_router
 from app.bot.handlers.progress import router as progress_router
-
 from app.bot.middlewares.logging import CommandLoggingMiddleware
 
 logging.basicConfig(level=logging.INFO)
 
 WEBHOOK_PATH = "/webhook"
-WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 PORT = int(os.getenv("PORT", "10000"))
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
+
 
 def get_base_url() -> str:
-    base = os.getenv("RENDER_EXTERNAL_URL") or os.getenv("APP_BASE_URL")
+    base = os.getenv("APP_BASE_URL") or os.getenv("RENDER_EXTERNAL_URL")
     if not base:
-        raise RuntimeError("Set RENDER_EXTERNAL_URL (Render sets it automatically) or APP_BASE_URL")
+        raise RuntimeError("APP_BASE_URL is not set")
     return base.rstrip("/")
 
 
-async def main():
+def main() -> None:
+    if not settings.BOT_TOKEN:
+        raise RuntimeError("BOT_TOKEN is not set")
+    if not WEBHOOK_SECRET:
+        raise RuntimeError("WEBHOOK_SECRET is not set")
+
     bot = Bot(token=settings.BOT_TOKEN)
     dp = Dispatcher(storage=MemoryStorage())
 
@@ -43,21 +48,8 @@ async def main():
     dp.include_router(progress_router)
 
     http = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10))
-
-    async def on_startup() -> None:
-        base_url = get_base_url()
-        webhook_url = f"{base_url}{WEBHOOK_PATH}"
-        await bot.set_webhook(
-            webhook_url,
-            secret_token=WEBHOOK_SECRET,
-            drop_pending_updates=True,
-        )
-        logging.info("Webhook set: %s", webhook_url)
-
-    async def on_shutdown() -> None:
-        await bot.delete_webhook(drop_pending_updates=True)
-        await http.close()
-        logging.info("Webhook deleted; http session closed")
+    dp["http"] = http
+    dp.workflow_data["http"] = http
 
     app = web.Application()
 
@@ -66,22 +58,35 @@ async def main():
 
     app.router.add_get("/healthz", healthz)
 
+    async def on_startup(_: web.Application) -> None:
+        webhook_url = f"{get_base_url()}{WEBHOOK_PATH}"
+        await bot.set_webhook(
+            webhook_url,
+            secret_token=WEBHOOK_SECRET,
+            drop_pending_updates=True,
+        )
+        logging.info("Webhook set: %s", webhook_url)
+
+    async def on_shutdown(_: web.Application) -> None:
+        await bot.delete_webhook(drop_pending_updates=True)
+        await http.close()
+        logging.info("Webhook deleted; http session closed")
+
+    app.on_startup.append(on_startup)
+    app.on_shutdown.append(on_shutdown)
+
     SimpleRequestHandler(
         dispatcher=dp,
         bot=bot,
         secret_token=WEBHOOK_SECRET,
-        http=http,  
+        http=http,
     ).register(app, path=WEBHOOK_PATH)
 
     setup_application(app, dp, bot=bot)
 
-    await on_startup()
-    try:
-        web.run_app(app, host="0.0.0.0", port=PORT)
-    finally:
-        await on_shutdown()
+    web.run_app(app, host="0.0.0.0", port=PORT)
 
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    main()
+
