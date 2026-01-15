@@ -61,20 +61,21 @@ def main() -> None:
         dp["http"] = http
         dp.workflow_data["http"] = http
 
-        webhook_url = f"{get_base_url()}{WEBHOOK_PATH}"
-        await bot.set_webhook(
-            webhook_url,
-            secret_token=WEBHOOK_SECRET,
-            drop_pending_updates=True,
-        )
+        base_url = (os.getenv("APP_BASE_URL") or os.getenv("RENDER_EXTERNAL_URL") or "").rstrip("/")
+        if not base_url:
+            raise RuntimeError("APP_BASE_URL (or RENDER_EXTERNAL_URL) is not set")
+
+        webhook_url = f"{base_url}{WEBHOOK_PATH}"
+        await bot.set_webhook(webhook_url, secret_token=WEBHOOK_SECRET, drop_pending_updates=True)
         logging.info("Webhook set: %s", webhook_url)
 
+
     async def on_shutdown(_: web.Application) -> None:
-        await bot.delete_webhook(drop_pending_updates=True)
         http = app.get("http")
         if http:
             await http.close()
-        logging.info("Webhook deleted; http session closed")
+        logging.info("Shutdown: http session closed")
+
 
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)
