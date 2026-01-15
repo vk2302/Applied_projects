@@ -25,7 +25,7 @@ WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET")
 def get_base_url() -> str:
     base = os.getenv("APP_BASE_URL") or os.getenv("RENDER_EXTERNAL_URL")
     if not base:
-        raise RuntimeError("APP_BASE_URL is not set")
+        raise RuntimeError("APP_BASE_URL is not set (or RENDER_EXTERNAL_URL missing)")
     return base.rstrip("/")
 
 
@@ -47,10 +47,6 @@ def main() -> None:
     dp.include_router(workout_router)
     dp.include_router(progress_router)
 
-    http = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10))
-    dp["http"] = http
-    dp.workflow_data["http"] = http
-
     app = web.Application()
 
     async def healthz(_: web.Request) -> web.Response:
@@ -59,6 +55,9 @@ def main() -> None:
     app.router.add_get("/healthz", healthz)
 
     async def on_startup(_: web.Application) -> None:
+        http = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10))
+        app["http"] = http
+
         webhook_url = f"{get_base_url()}{WEBHOOK_PATH}"
         await bot.set_webhook(
             webhook_url,
@@ -69,18 +68,22 @@ def main() -> None:
 
     async def on_shutdown(_: web.Application) -> None:
         await bot.delete_webhook(drop_pending_updates=True)
-        await http.close()
+        http: aiohttp.ClientSession | None = app.get("http")
+        if http:
+            await http.close()
         logging.info("Webhook deleted; http session closed")
 
     app.on_startup.append(on_startup)
     app.on_shutdown.append(on_shutdown)
+    
+    def data_factory(_: web.Request) -> dict:
+        return {"http": app["http"]}
 
     SimpleRequestHandler(
         dispatcher=dp,
         bot=bot,
         secret_token=WEBHOOK_SECRET,
-        http=http,
-    ).register(app, path=WEBHOOK_PATH)
+    ).register(app, path=WEBHOOK_PATH, data_factory=data_factory)
 
     setup_application(app, dp, bot=bot)
 
