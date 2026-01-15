@@ -1,4 +1,5 @@
 import re
+import asyncio
 from datetime import datetime
 
 import aiohttp
@@ -48,14 +49,14 @@ async def log_food_start(message: Message, state: FSMContext, http: aiohttp.Clie
     await state.clear()
 
     try:
-    candidates = await search_food_candidates(
-        http,
-        query=query,
-        user_agent=settings.OFF_USER_AGENT,
-        page_size=15,
-        limit=5,
-        timeout_s=10.0,
-    )
+        candidates = await search_food_candidates(
+            http,
+            query=query,
+            user_agent=settings.OFF_USER_AGENT,
+            page_size=15,
+            limit=5,
+            timeout_s=7.0,
+            )
     except (asyncio.TimeoutError, aiohttp.ClientError):
         await message.answer(
             "Сервис слишком долго ищет Ваш запрос. "

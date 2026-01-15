@@ -53,7 +53,8 @@ async def search_food_candidates(
     headers = {"User-Agent": user_agent}
     timeout = aiohttp.ClientTimeout(total=timeout_s)
 
-    async with session.get(url, params=params, headers=headers) as resp:
+    async with session.get(url, params=params, headers=headers, timeout=timeout) as resp:
+
         resp.raise_for_status()
         data = await resp.json()
 
