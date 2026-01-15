@@ -8,6 +8,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 
 from app.config import settings
+from app.bot.handlers.start import router as start_router
 from app.bot.handlers.profile import router as profile_router
 from app.bot.handlers.water import router as water_router
 from app.bot.handlers.food import router as food_router
@@ -40,7 +41,7 @@ def main() -> None:
 
     dp.message.middleware(CommandLoggingMiddleware())
     dp.callback_query.middleware(CommandLoggingMiddleware())
-
+    dp.include_router(start_router)
     dp.include_router(profile_router)
     dp.include_router(water_router)
     dp.include_router(food_router)
