@@ -2,6 +2,9 @@
 
 Запустить проект локально: docker compose up —build, затем открыть http://localhost:8000
 
+Ссылка на сервис: https://url-shortener-fqgc.onrender.com
+Swagger: https://url-shortener-fqgc.onrender.com/docs
+
 Функции:
 	•	создание короткой ссылки из длинного URL
 	•	переход по короткой ссылке с автоматическим редиректом
