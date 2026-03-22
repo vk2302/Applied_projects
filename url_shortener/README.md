@@ -5,7 +5,7 @@
 Ссылка на сервис: https://url-shortener-fqgc.onrender.com
 Swagger: https://url-shortener-fqgc.onrender.com/docs
 
-Функции:
+### Функции:
 	•	создание короткой ссылки из длинного URL
 	•	переход по короткой ссылке с автоматическим редиректом
 	•	просмотр статистик по ссылке
@@ -13,7 +13,7 @@ Swagger: https://url-shortener-fqgc.onrender.com/docs
 	•	обновление ссылки;
 	•	удаление ссылки.
 
-Дополнительные возможности:
+### Дополнительные возможности:
 	•	создание персональных кастомных ссылок 
 	•	указание срока жизни ссылки: expires_at
 	•	хранение информации о пользователе
@@ -21,7 +21,7 @@ Swagger: https://url-shortener-fqgc.onrender.com/docs
 	•	группировка ссылок по проектам
 	•	хранение в кэше недавних данных (Redis): short_code -> original_url, статистика по ссылке. Кеш очищается при изменении или удалении ссылок
 
-Директории проекта:
+### Директории проекта:
 	•	models — таблицы базы данных
 	•	schemas — структуры запросов и ответов
 	•	routes — HTTP-endpoints
@@ -29,7 +29,7 @@ Swagger: https://url-shortener-fqgc.onrender.com/docs
 	•	core — настройки
 	•	db — подключение к базе данных
 
-Ссылки
+### Ссылки
 	•	POST /links/shorten — создание короткой ссылки
 	•	GET /{short_code} — перейти по ней
 	•	GET /links/{short_code}/stats — получить статистику
@@ -37,18 +37,18 @@ Swagger: https://url-shortener-fqgc.onrender.com/docs
 	•	PUT /links/{short_code} — обновить ссылку
 	•	DELETE /links/{short_code} — удалить ссылку
 
-Проекты
+### Проекты
 	•	POST /projects — создать проект
 	•	GET /projects — получить список проектов
 
-Архив
+### Архив
 	•	GET /links/expired-history — посмотреть архив удаленных ссылок
 
-Авторизация
+### Авторизация
 	•	POST /auth/register — регистрация 
 	•	POST /auth/login — логин и получение токена. Изменение и удаление ссылки доступны только авторизованному пользователю
 
-Ссылки
+### Ссылки
 	•	POST /links/shorten — создать короткую ссылку
 	•	GET /{short_code} — перейти по короткой ссылке
 	•	GET /links/{short_code}/stats — получить статистику
@@ -56,40 +56,130 @@ Swagger: https://url-shortener-fqgc.onrender.com/docs
 	•	PUT /links/{short_code} — обновить ссылку
 	•	DELETE /links/{short_code} — удалить ссылку
 
-Проекты
+### Проекты
 	•	POST /projects — создать проект
 	•	GET /projects — получить список проектов
 
-Архив
+### Архив
 	•	GET /links/expired-history — посмотреть архив удалённых и истёкших ссылок
 
 База данных: PostgreSQL, таблицы: users, projects, links, archived links
 
 
-К чекпойнту 4: добавлены Unit, функциональные тесты на pytest и FastAPI TestClient, для кэша используется mock
+## Checkpoint 4 - тесты
 
-База: тестовая SQLite in-memory база.
-Нагрузочное тестирование выполнено с помощью Locust.
+были добавлены тесты и инструменты проверки качества:
+- unit-тестирование
+- функциональные API тесты с pytest и FastAPI TestClient
+- mock кэша для изоляции тестов
+- отдельная тестовая база данных на SQLite in-memory
+- нагрузочное тестирование с помощью Locust
+- HTML-отчёт покрытия для визуальной проверки test coverage
 
-### Load testing
+### Что тестируется
 
-нагрузочный тест был проведен с помощью команды:
-docker compose exec app locust -f locustfile.py --host=http://localhost:8000 --headless -u 20 -r 2 -t 30s
-	•	Total requests: 344
-	•	Failures: 0
-	•	Average response time:
-	•	GET /health: ~3-4 ms
-	•	POST /links/shorten: ~10 ms
-	•	Throughput: ~11.53 req/s
+- регистрация пользователя
+- логин пользователя
+- создание короткой ссылки
+- создание кастомной короткой ссылки (`custom_alias`)
+- проверка уникальности alias
+- получение статистики по ссылке
+- перенаправление по короткой ссылке
+- увеличение счётчика переходов после редиректа
+- обновление ссылки
+- удаление ссылки
+- поиск ссылки по исходному URL
+- работа с проектами
+- архив удалённых ссылок
+- генерация короткого кода
 
-Вывод: сервис справляется с конкурирующими запросами по созданию ссылок + health checks
+### Тестовая инфраструктура
 
-Все основные тесты сработали хорошо, coverage 91%. Команды: 
-coverage run -m pytest tests
-coverage report -m
+- для базы данных используется SQLite in-memory
+- вместо Redis есть mock/fake cache
+- состояние тестовой базы пересоздаётся для каждого теста
+- TestClient используется для проверки HTTP API без запуска внешнего сервера
+
+Такой подход позволяет сделать тесты быстрыми, воспроизводимыми и независимыми от боевого окружения.
+
+### Итоговое покрытие тестами
+
+**91%** - итоговое покрытие кода
+
+HTML-отчёт покрытия находится в папке:
+
+url_shortener/htmlcov/index.html
+
+### Как запустить тесты
+
+Запуск всех тестов:
+
+pytest tests
+
+Запуск с вычислением coverage:
+
+coverage run -m pytest tests  
+coverage report -m  
 coverage html
 
-Результаты:
+HTML-отчёт доступен в отдельно созданной папке
+
+htmlcov/index.html
+
+### Нагрузочный тест
+
+Для нагрузочного тестирования использовался Locust.
+
+Команда запуска:
+
+docker compose exec app locust -f locustfile.py --host=http://localhost:8000 --headless -u 20 -r 2 -t 30s
+
+Результаты нагрузочного теста:
+
+Нагрузочный тест:
+
+- **Total requests:** 344
+- **Failures:** 0
+- **Average response time:**
+  - GET /health — ~3–4 ms
+  - POST /links/shorten — ~10 ms
+- **Throughput:** ~11.53 req/s
+
+Сервис корректно обрабатывает конкурентные запросы на создание ссылок и health-check
+
+Тесты в папке tests/
+- `tests/conftest.py` — тестовая конфигурация
+- `tests/test_auth.py` — тесты авторизации
+- `tests/test_links_api.py` — основные API-тесты для ссылок
+- `tests/test_search_and_history.py` — тесты поиска и архива
+- `tests/test_shortener_unit.py` — unit-тесты генерации короткого кода
+- `locustfile.py` — сценарий нагрузочного тестирования
+
+### Результаты (как в html файле):
+
+- **Total statements:** 660
+- **Missed:** 61
+- **Coverage:** 91%
+
+- `app/api/routes/auth.py` — **100%**
+- `app/api/routes/projects.py` — **100%**
+- `app/services/shortener.py` — **100%**
+- `app/core/config.py` — **100%**
+- `app/models/*` — **100%**
+- `app/schemas/*` — **100%**
+
+Модули с более низким покрытием:
+
+- `app/api/deps.py` — **80%**
+- `app/api/routes/links.py` — **82%**
+- `app/core/security.py` — **89%**
+- `app/main.py` — **79%**
+- `app/services/cleanup.py` — **35%**
+
+<details>
+<summary>Полный отчёт coverage report -m</summary>
+
+```text
 Name                               Stmts   Miss  Cover   Missing
 ----------------------------------------------------------------
 app/__init__.py                        0      0   100%
