@@ -65,6 +65,11 @@ def health():
     return {"status": "ok"}
 
 
+app.include_router(auth_router)
+app.include_router(projects_router)
+app.include_router(links_router)
+
+
 @app.get("/{short_code}")
 def redirect_short_link(
     short_code: str,
@@ -90,8 +95,3 @@ def redirect_short_link(
     set_cached_original_url(short_code, original_url)
 
     return RedirectResponse(url=original_url, status_code=307)
-
-
-app.include_router(auth_router)
-app.include_router(projects_router)
-app.include_router(links_router)
